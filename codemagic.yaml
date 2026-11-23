@@ -1,0 +1,62 @@
+# OpenVision unsigned IPA build for Codemagic
+# 使い方：
+# 1. Codemagic に rayl15/OpenVision を登録する
+# 2. Environment variables（Secure）に TEAM_ID / BUNDLE_ID / META_APP_ID / CLIENT_TOKEN を登録する
+# 3. このファイルを codemagic.yaml という名前で使う（Codemagic の Workflow Editor で
+#    YAML を読み込むか、リポジトリ直下に codemagic.yaml として置く）
+# 成果物： build/OpenVision-unsigned.ipa（AltStore で自分の Apple ID で署名して入れる）
+
+workflows:
+  openvision-unsigned:
+    name: OpenVision unsigned IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - openvision
+      xcode: latest
+    scripts:
+      - name: Generate Config.xcconfig from environment variables
+        script: |
+          cat > Config.xcconfig << EOF
+          DEVELOPMENT_TEAM = $TEAM_ID
+          PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID
+          META_APP_ID = $META_APP_ID
+          CLIENT_TOKEN = $CLIENT_TOKEN
+          APP_LINK_URL_SCHEME = openvision
+          EOF
+          echo "Config.xcconfig generated"
+      - name: Create Config.swift from example
+        script: |
+          cp OpenVision/Config/Config.swift.example OpenVision/Config/Config.swift
+      - name: Install XcodeGen
+        script: |
+          brew install xcodegen
+      - name: Download Metal Toolchain (needed by on-device MLX models)
+        script: |
+          xcodebuild -downloadComponent MetalToolchain
+      - name: Generate Xcode project
+        script: |
+          xcodegen generate
+      - name: Build unsigned for device
+        script: |
+          xcodebuild -project OpenVision.xcodeproj \
+            -scheme OpenVision \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+      - name: Package unsigned IPA
+        script: |
+          mkdir -p build/Payload
+          cp -R build/DerivedData/Build/Products/Release-iphoneos/OpenVision.app build/Payload/
+          cd build && zip -qry OpenVision-unsigned.ipa Payload
+          ls -lh OpenVision-unsigned.ipa
+    artifacts:
+      - build/OpenVision-unsigned.ipa
