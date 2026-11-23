@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appID": "5AU5JX3RJG.com.katsuwonder.openvision",
+        "paths": [ "/openvision/*" ]
+      }
+    ]
+  }
+}
